@@ -12,6 +12,7 @@ module.exports = {
         ),
 
     async execute(interaction) {
+
         const idea = interaction.options.getString('idea');
         const user = interaction.user;
 
@@ -44,7 +45,8 @@ module.exports = {
             await interaction.reply({ content: `**¡Gracias por tu sugerencia!** Ha sido enviada al canal de <#${suggestionChannelId}>.`, ephemeral: true });
         } catch (error) {
             console.error('Error al enviar la sugerencia:', error);
-            await interaction.reply({ content: 'Ocurrió un error al procesar tu sugerencia.', ephemeral: true });
+            await interaction.editReply({ content: 'Ocurrió un error al procesar tu sugerencia.', ephemeral: true });
         }
     },
+
 };

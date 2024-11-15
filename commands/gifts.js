@@ -24,6 +24,12 @@ module.exports = {
         .setRequired(true)),
 
   async execute(interaction) {
+    try {
+      await interaction.deferReply(); // Defers the reply (we are going to edit it later)
+    } catch (error) {
+      return interaction.reply({ content: 'Hubo un error al intentar iniciar el sorteo.', ephemeral: true });
+    }
+
     // Verificar si el usuario tiene el rol permitido
     if (!interaction.member.roles.cache.has(ALLOWED_ROLE_ID)) {
       return interaction.reply({ content: 'No tienes permiso para crear sorteos.', ephemeral: true });
@@ -35,12 +41,11 @@ module.exports = {
 
     const durationMs = ms(duration);
     if (!durationMs || durationMs <= 0) {
-      return interaction.reply('Por favor, proporciona una duración válida (ejemplo: 10m, 1h, 1d).');
+      return interaction.editReply('Por favor, proporciona una duración válida (ejemplo: 10m, 1h, 1d).');
     }
 
     const expirationTime = Date.now() + durationMs;
     const expirationTimestamp = Math.floor(expirationTime / 1000); // Convertir a segundos
-    const formattedExpiration = formatDistanceToNow(addMilliseconds(Date.now(), durationMs), { addSuffix: true });
 
     const embed = new EmbedBuilder()
       .setColor('#60a5fa')
@@ -48,7 +53,7 @@ module.exports = {
       .addFields(
         { name: 'Cantidad:', value: `<:dot:1296709116231684106>${coins} coins`, inline: false },
         { name: 'Rol:', value: `<:dot:1296709116231684106><@&${role.id}>`, inline: true },
-        { name: '**Expira en:**', value: `<:dot:1296709116231684106><t:${expirationTimestamp}:R>`, inline: true } // Marca de tiempo
+        { name: '**Expira en:**', value: `<:dot:1296709116231684106><t:${expirationTimestamp}:R>`, inline: true }
       )
       .setFooter({ text: 'Haz clic en el botón para reclamar tu regalo.' });
 
@@ -57,10 +62,10 @@ module.exports = {
         new ButtonBuilder()
           .setCustomId('gift_claim')
           .setStyle(ButtonStyle.Secondary)
-          .setEmoji({ id: '1296709132266770432', name: 'stars' }) // Emoji corregido
+          .setEmoji({ id: '1296709132266770432', name: 'stars' })
       );
 
-    await interaction.reply({
+    await interaction.editReply({
       embeds: [embed],
       components: [row]
     });
@@ -88,11 +93,16 @@ module.exports = {
     collector.on('collect', async (i) => {
       if (!usuariosQueReclamaron.has(i.user.id)) {
         usuariosQueReclamaron.add(i.user.id);
-        const success = await addCoinsToUser(i.user.id, coins);
-        if (success) {
-          await i.reply({ content: `¡Has reclamado exitosamente el regalo de ${coins} monedas!`, ephemeral: true });
-        } else {
-          await i.reply({ content: 'Hubo un error al procesar tu regalo. Intenta nuevamente.', ephemeral: true });
+        try {
+          const success = await addCoinsToUser(i.user.id, coins);
+          if (success) {
+            await i.reply({ content: `¡Has reclamado exitosamente el regalo de ${coins} monedas!`, ephemeral: true });
+          } else {
+            await i.reply({ content: 'Hubo un error al procesar tu regalo. Intenta nuevamente.', ephemeral: true });
+          }
+        } catch (error) {
+          console.error('Error al procesar la reclamación:', error);
+          await i.reply({ content: 'Hubo un error al procesar tu solicitud.', ephemeral: true });
         }
       } else {
         await i.reply({ content: '¡Ya reclamaste este regalo!', ephemeral: true });
@@ -100,17 +110,22 @@ module.exports = {
     });
 
     collector.on('end', async () => {
-      const updatedEmbed = new EmbedBuilder(embed)
-        .setTitle(`Wonho's Gift (Finalizado)`)
-        .addFields(
-          { name: 'Total de participantes:', value: `<:dot:1296709116231684106>${usuariosQueReclamaron.size} usuarios.` }
-        )
-        .setFooter({ text: 'El regalo ha expirado.' }); 
+      // Verifica si el embed aún está disponible para editarlo
+      try {
+        const updatedEmbed = new EmbedBuilder(embed)
+          .setTitle(`Wonho's Gift (Finalizado)`)
+          .addFields(
+            { name: 'Total de participantes:', value: `<:dot:1296709116231684106>${usuariosQueReclamaron.size} usuarios.` }
+          )
+          .setFooter({ text: 'El regalo ha expirado.' });
 
-      await interaction.editReply({
-        embeds: [updatedEmbed],
-        components: []
-      });
+        await interaction.editReply({
+          embeds: [updatedEmbed],
+          components: [] // Eliminar botones después de la expiración
+        });
+      } catch (error) {
+        console.error('Error al intentar editar el embed final:', error);
+      }
     });
   },
 };

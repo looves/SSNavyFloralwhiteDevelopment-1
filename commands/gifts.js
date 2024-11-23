@@ -25,7 +25,7 @@ module.exports = {
 
   async execute(interaction) {
     try {
-      await interaction.deferReply(); // Defers the reply (we are going to edit it later)
+      await interaction.deferReply(); // Deferred reply
     } catch (error) {
       return interaction.reply({ content: 'Hubo un error al intentar iniciar el sorteo.', ephemeral: true });
     }
@@ -112,6 +112,11 @@ module.exports = {
     collector.on('end', async () => {
       // Verifica si el embed aún está disponible para editarlo
       try {
+        if (interaction.deleted) {
+          console.error('La interacción ha sido eliminada antes de editarla.');
+          return;
+        }
+
         const updatedEmbed = new EmbedBuilder(embed)
           .setTitle(`Wonho's Gift (Finalizado)`)
           .addFields(

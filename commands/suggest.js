@@ -26,6 +26,9 @@ module.exports = {
             return interaction.reply({ content: 'No se pudo encontrar el canal de sugerencias.', ephemeral: true });
         }
 
+        // Defer the reply to give the bot time to process the suggestion
+        await interaction.deferReply({ ephemeral: true });
+
         // Crear un embed con la sugerencia
         const suggestEmbed = new EmbedBuilder()
             .setTitle('Nueva sugerencia:')
@@ -41,11 +44,11 @@ module.exports = {
             await message.react('<:check:1296709540494053407>');  // Check
             await message.react('<:cross:1296709493089894432>');  // Equís
 
-            // Responder a quien sugirió de forma efímera
-            await interaction.reply({ content: `**¡Gracias por tu sugerencia!** Ha sido enviada al canal de <#${suggestionChannelId}>.`, ephemeral: true });
+            // Responder a quien sugirió de forma efímera usando followUp
+            await interaction.followUp({ content: `**¡Gracias por tu sugerencia!** Ha sido enviada al canal de <#${suggestionChannelId}>.`, ephemeral: true });
         } catch (error) {
             console.error('Error al enviar la sugerencia:', error);
-            await interaction.editReply({ content: 'Ocurrió un error al procesar tu sugerencia.', ephemeral: true });
+            await interaction.followUp({ content: 'Ocurrió un error al procesar tu sugerencia.', ephemeral: true });
         }
     },
 

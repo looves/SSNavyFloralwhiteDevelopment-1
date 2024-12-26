@@ -27,8 +27,12 @@ module.exports = {
             .setRequired(true))
         .addStringOption(option =>
           option.setName('rarity')
-            .setDescription('Rareza de la carta (1, 2).')
-            .setRequired(true))),
+            .setDescription('Rareza de la carta (1).')
+            .setRequired(true))
+        .addStringOption(option =>
+          option.setName('event')
+            .setDescription('Nombre del evento para la carta.')
+            .setRequired(false))),
 
   async execute(interaction) {
     try {
@@ -53,12 +57,12 @@ module.exports = {
       const grupo = interaction.options.getString('group');
       const era = interaction.options.getString('era');
       const rarity = interaction.options.getString('rarity');
+      const event = interaction.options.getString('event'); // Nombre del evento
 
-      // Validar que la rareza sea '1', no permitir '2' o '3'
-      if (rarity !== '1') {
+      // Si no se ha proporcionado un evento, validamos que la rareza sea '1', no permitir '2' o '3'
+      if (!event && rarity !== '1') {
         return interaction.editReply({ content: 'Solo se permiten cartas con rareza 1. **No se puede generar una carta de rareza 2 o 3.**', ephemeral: true });
       }
-
 
       // Función para escapar caracteres especiales en la expresión regular
       const escapeRegExp = (string) => {
@@ -67,19 +71,26 @@ module.exports = {
 
       try {
         // Buscar la carta en la base de datos utilizando expresiones regulares
-        const card = await Card.findOne({
+        const query = {
           idol: { $regex: new RegExp(escapeRegExp(idol), 'i') },
           grupo: { $regex: new RegExp(escapeRegExp(grupo), 'i') },
           era: { $regex: new RegExp(escapeRegExp(era), 'i') },
-          rarity: rarity,
-        });
+          rarity: event ? { $in: ['1', '2', '3'] } : rarity, // Ignorar rareza si es evento
+        };
+
+        // Si se proporcionó un evento, agregarlo al query
+        if (event) {
+          query.event = { $regex: new RegExp(escapeRegExp(event), 'i') }; // Buscamos el evento en la carta
+        }
+
+        const card = await Card.findOne(query);
 
         if (!card) {
           return interaction.editReply({ content: 'No se encontró ninguna carta que coincida con los criterios proporcionados.', ephemeral: true });
         }
 
         // Generar el código único basado en los datos de la carta
-        const uniqueCode = generateCardCode(card.idol, card.grupo, card.era, card.rarity);
+        const uniqueCode = generateCardCode(card.idol, card.grupo, card.era, card.rarity, card.event );
 
         // Incrementar el conteo de la carta y actualizar el inventario del usuario
         const { copyNumber } = await incrementCardCount(interaction.user.id, card._id);
@@ -93,6 +104,7 @@ module.exports = {
           era: card.era,
           eshort: card.eshort,
           rarity: card.rarity,
+          event: card.event,
           uniqueCode,
           copyNumber,
           command: '/generate', // Guardar que fue generado por este comando

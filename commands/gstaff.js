@@ -1,7 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const Card = require('../models/Card');
 const DroppedCard = require('../models/DroppedCard');
-const User = require('../models/User'); 
 const incrementCardCount = require('../utils/incrementCardCount');
 const generateCardCode = require('../utils/generateCardCode');
 
@@ -12,23 +11,27 @@ module.exports = {
     .addSubcommand(subcommand =>
       subcommand
         .setName('generate')
-      .setDescription('solo para staff.')
-    .addStringOption(option =>
-      option.setName('idol')
-        .setDescription('Nombre del idol.')
-        .setRequired(true))
-    .addStringOption(option =>
-      option.setName('group')
-        .setDescription('Nombre del grupo.')
-        .setRequired(true))
-    .addStringOption(option =>
-      option.setName('era')
-        .setDescription('Nombre de la era.')
-        .setRequired(true))
-    .addStringOption(option =>
-      option.setName('rarity')
-        .setDescription('Rareza de la carta (1, 2 o 3).')
-        .setRequired(true))),
+        .setDescription('solo para staff.')
+        .addStringOption(option =>
+          option.setName('idol')
+            .setDescription('Nombre del idol.')
+            .setRequired(true))
+        .addStringOption(option =>
+          option.setName('group')
+            .setDescription('Nombre del grupo.')
+            .setRequired(true))
+        .addStringOption(option =>
+          option.setName('era')
+            .setDescription('Nombre de la era.')
+            .setRequired(true))
+        .addStringOption(option =>
+          option.setName('rarity')
+            .setDescription('Rareza de la carta (1, 2 o 3).')
+            .setRequired(true))
+        .addStringOption(option =>
+          option.setName('event')
+            .setDescription('Nombre del evento (opcional).')
+            .setRequired(false))),
 
   async execute(interaction) {
     try {
@@ -46,18 +49,11 @@ module.exports = {
       return interaction.editReply({ content: 'No tienes el permiso necesario para usar este comando.', ephemeral: true });
     }
 
-    // Verificar si el usuario ya ha usado el comando una vez
-    const user = await User.findOne({ userId: interaction.user.id });
-
-    // Si el usuario ya ha usado el comando, no se permite usarlo de nuevo
-    if (user && user.GenerateStaff) {
-      return interaction.editReply({ content: 'Ya has usado este comando una vez. No puedes volver a usarlo.', ephemeral: true });
-    }
-
     const idol = interaction.options.getString('idol');
     const grupo = interaction.options.getString('group');
     const era = interaction.options.getString('era');
     const rarity = interaction.options.getString('rarity');
+    const event = interaction.options.getString('event'); // Obtener el valor del evento
 
     // Función para escapar caracteres especiales en la expresión regular
     const escapeRegExp = (string) => {
@@ -65,20 +61,33 @@ module.exports = {
     };
 
     try {
-      // Buscar la carta en la base de datos utilizando expresiones regulares
-      const card = await Card.findOne({
-        idol: { $regex: new RegExp(escapeRegExp(idol), 'i') },
-        grupo: { $regex: new RegExp(escapeRegExp(grupo), 'i') },
-        era: { $regex: new RegExp(escapeRegExp(era), 'i') },
-        rarity: rarity,
-      });
+      let card;
+
+      // Si el campo 'event' está presente, ignoramos la 'rarity'
+      if (event) {
+        // Buscar la carta usando todos los filtros excepto 'rarity' cuando 'event' está presente
+        card = await Card.findOne({
+          idol: { $regex: new RegExp(escapeRegExp(idol), 'i') },
+          grupo: { $regex: new RegExp(escapeRegExp(grupo), 'i') },
+          era: { $regex: new RegExp(escapeRegExp(era), 'i') },
+          event: { $regex: new RegExp(escapeRegExp(event), 'i') },
+        });
+      } else {
+        // Buscar la carta incluyendo la 'rarity' si 'event' no está presente
+        card = await Card.findOne({
+          idol: { $regex: new RegExp(escapeRegExp(idol), 'i') },
+          grupo: { $regex: new RegExp(escapeRegExp(grupo), 'i') },
+          era: { $regex: new RegExp(escapeRegExp(era), 'i') },
+          rarity: rarity,
+        });
+      }
 
       if (!card) {
         return interaction.editReply({ content: 'No se encontró ninguna carta que coincida con los criterios proporcionados.', ephemeral: true });
       }
 
       // Genera el código único basado en los datos de la carta
-      const uniqueCode = generateCardCode(card.idol, card.grupo, card.era, card.rarity);
+      const uniqueCode = generateCardCode(card.idol, card.grupo, card.era, card.rarity, card.event );
 
       // Incrementar el conteo de la carta y actualizar el inventario del usuario
       const { copyNumber } = await incrementCardCount(interaction.user.id, card._id);
@@ -92,26 +101,13 @@ module.exports = {
         era: card.era,
         eshort: card.eshort,
         rarity: card.rarity,
+        event: card.event,
         uniqueCode,
         copyNumber,
         command: '/generate staff', // Guardar que fue generado por este comando
       });
 
       await droppedCard.save();
-
-      // Actualizar el modelo de usuario para marcar que ha usado el comando
-      if (!user) {
-        // Si el usuario no existe, crear un nuevo registro
-        const newUser = new User({
-          userId: interaction.user.id,
-          GenerateStaff: true,
-        });
-        await newUser.save();
-      } else {
-        // Si el usuario existe, actualizar el campo hasUsedGenerate
-        user.GenerateStaff = true;
-        await user.save();
-      }
 
       // Crear el embed para mostrar la carta generada
       const cardEmbed = new EmbedBuilder()

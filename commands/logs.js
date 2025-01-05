@@ -53,9 +53,16 @@ module.exports = {
             .setFooter({ text: `Página ${page + 1} de ${totalPages}` });
 
           droppedCards.forEach(droppedCard => {
+          // Obtener emoji por defecto según la rareza
+          let emoji = rarityToEmojis(droppedCard.rarity);
+
+          // Si la carta tiene un evento, usamos el emoji relacionado al evento
+          if (droppedCard.event) {
+            emoji = rarityToEmojis(droppedCard.event); // Usa el valor del evento para determinar el emoji
+          }
             embed.addFields({
               name: `${droppedCard.idol} ${droppedCard.grupo}<:dot:1296707029087555604> \`#${droppedCard.copyNumber}\``,
-              value: `${droppedCard.event || droppedCard.era} ${rarityToEmojis(droppedCard.rarity)}\n-# ${droppedCard.command}\`\`\`${droppedCard.uniqueCode}\`\`\`<@${droppedCard.userId}>`,
+              value: `${droppedCard.event || droppedCard.era} ${emoji}\n-# ${droppedCard.command}\`\`\`${droppedCard.uniqueCode}\`\`\`<@${droppedCard.userId}>`,
               inline: true,
             });
           });

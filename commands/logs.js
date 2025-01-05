@@ -37,7 +37,7 @@ module.exports = {
       // Lógica para obtener los registros para la página actual
       const getDroppedCards = async (page) => {
         return await DroppedCard.find()
-          .select('idol grupo copyNumber rarity uniqueCode event userId')  // Selecciona solo los campos necesarios
+          .select('idol grupo copyNumber rarity uniqueCode era event userId command')  // Selecciona solo los campos necesarios
           .skip(page * maxFields)  // Omitir los resultados previos
           .limit(maxFields)  // Limitar a 9 resultados
           .lean();  // Mejor rendimiento al usar lean
@@ -55,7 +55,7 @@ module.exports = {
           droppedCards.forEach(droppedCard => {
             embed.addFields({
               name: `${droppedCard.idol} ${droppedCard.grupo}<:dot:1296707029087555604> \`#${droppedCard.copyNumber}\``,
-              value: `${droppedCard.event} ${rarityToEmojis(droppedCard.rarity)}\n-# ${droppedCard.command}\`\`\`${droppedCard.uniqueCode}\`\`\`<@${droppedCard.userId}>`,
+              value: `${droppedCard.event || droppedCard.era} ${rarityToEmojis(droppedCard.rarity)}\n-# ${droppedCard.command}\`\`\`${droppedCard.uniqueCode}\`\`\`<@${droppedCard.userId}>`,
               inline: true,
             });
           });

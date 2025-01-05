@@ -1,10 +1,10 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType } = require('discord.js');
-const DroppedCard = require('../models/DroppedCard'); 
+const DroppedCard = require('../models/DroppedCard');
 const rarityToEmojis = require('../utils/rarityToEmojis');
 
 // Define el ID del rol permitido
-const ALLOWED_ROLE_ID = '1297309417980559403';  // Reemplaza con el ID de tu rol permitido
+const ALLOWED_ROLE_ID = '1076999909770788965';  // Reemplaza con el ID de tu rol permitido
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -26,39 +26,42 @@ module.exports = {
         return interaction.editReply({ content: 'No tienes el rol necesario para ejecutar este comando.', ephemeral: true });
       }
 
-      // Obtiene todos los registros de drops de la base de datos
-      const droppedCards = await DroppedCard.find();
-
-      if (droppedCards.length === 0) {
-        return interaction.reply({ content: 'No se encontraron registros de drops.', ephemeral: true });
-      }
-
-      // Lógica para paginación
+      // Paginación
       const maxFields = 9; // Máximo de campos por página
-      const totalPages = Math.ceil(droppedCards.length / maxFields);
       let currentPage = 0;
+
+      // Obtiene la cantidad total de registros (para calcular el número de páginas)
+      const totalRecords = await DroppedCard.countDocuments();
+      const totalPages = Math.ceil(totalRecords / maxFields);
+
+      // Lógica para obtener los registros para la página actual
+      const getDroppedCards = async (page) => {
+        return await DroppedCard.find()
+          .select('idol grupo copyNumber rarity uniqueCode event userId')  // Selecciona solo los campos necesarios
+          .skip(page * maxFields)  // Omitir los resultados previos
+          .limit(maxFields)  // Limitar a 9 resultados
+          .lean();  // Mejor rendimiento al usar lean
+      };
 
       // Generar el embed con los datos de la página actual
       const generateEmbed = (page) => {
-        const embed = new EmbedBuilder()
-          .setTitle('Historial de /drop and /daily')
-          .setTimestamp()
-          .setColor('#60a5fa')
-          .setFooter({ text: `Página ${page + 1} de ${totalPages}` });
+        return getDroppedCards(page).then((droppedCards) => {
+          const embed = new EmbedBuilder()
+            .setTitle('Historial de /drop and /daily')
+            .setTimestamp()
+            .setColor('#60a5fa')
+            .setFooter({ text: `Página ${page + 1} de ${totalPages}` });
 
-        const start = page * maxFields;
-        const end = start + maxFields;
-        const pageItems = droppedCards.slice(start, end);
-
-        pageItems.forEach(droppedCard => {
-          embed.addFields({
-            name: `${droppedCard.idol} ${droppedCard.grupo}<:dot:1296707029087555604> \`#${droppedCard.copyNumber}\``,
-            value: `${droppedCard.era} ${rarityToEmojis(droppedCard.rarity)}\n-# ${droppedCard.command}\`\`\`${droppedCard.uniqueCode}\`\`\`<@${droppedCard.userId}>`,
-            inline: true,
+          droppedCards.forEach(droppedCard => {
+            embed.addFields({
+              name: `${droppedCard.idol} ${droppedCard.grupo}<:dot:1296707029087555604> \`#${droppedCard.copyNumber}\``,
+              value: `${droppedCard.event} ${rarityToEmojis(droppedCard.rarity)}\n-# ${droppedCard.command}\`\`\`${droppedCard.uniqueCode}\`\`\`<@${droppedCard.userId}>`,
+              inline: true,
+            });
           });
-        });
 
-        return embed;
+          return embed;
+        });
       };
 
       // Crear una fila de botones para la paginación
@@ -93,7 +96,7 @@ module.exports = {
 
       // Enviar el primer embed y los botones
       const message = await interaction.editReply({
-        embeds: [generateEmbed(currentPage)],
+        embeds: [await generateEmbed(currentPage)],
         components: [getButtonRow(currentPage)],
         fetchReply: true
       });
@@ -101,7 +104,7 @@ module.exports = {
       // Crear un collector para manejar las interacciones de los botones
       const collector = message.createMessageComponentCollector({
         componentType: ComponentType.Button,
-        time: 600000  // Timeout después de 1 minuto
+        time: 600000  // Timeout después de 10 minutos
       });
 
       collector.on('collect', async i => {
@@ -124,7 +127,7 @@ module.exports = {
         }
 
         // Actualizar el embed con la nueva página
-        await i.update({ embeds: [generateEmbed(currentPage)], components: [getButtonRow(currentPage)] });
+        await i.update({ embeds: [await generateEmbed(currentPage)], components: [getButtonRow(currentPage)] });
       });
 
       collector.on('end', async () => {

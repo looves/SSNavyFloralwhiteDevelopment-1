@@ -7,7 +7,7 @@ const cardSchema = new Schema({
   eshort: { type: String, required: true, index: true },
   rarity: { type: String, required: true, index: true },
   image: { type: String, required: true, index: true },
-  event: { type: String, required: false, index: true },
+  event: { type: String, required: true, index: true },
   count: { type: Number, default: 0 }, 
 });
 

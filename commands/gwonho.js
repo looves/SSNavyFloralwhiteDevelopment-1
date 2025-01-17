@@ -3,7 +3,7 @@ const Card = require('../models/Card');
 const DroppedCard = require('../models/DroppedCard');
 const incrementCardCount = require('../utils/incrementCardCount');
 const generateCardCode = require('../utils/generateCardCode');
-const User = require('../models/User'); // Importamos el modelo User
+const User = require('../models/User'); // Para manejar los límites mensuales
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -12,7 +12,7 @@ module.exports = {
     .addSubcommand(subcommand =>
       subcommand
         .setName('generate')
-        .setDescription('solo para staff.')
+        .setDescription('solo para ko-fi o patreo members.')
         .addStringOption(option =>
           option.setName('idol')
             .setDescription('Nombre del idol.')
@@ -33,65 +33,76 @@ module.exports = {
           option.setName('event')
             .setDescription('Nombre del evento (opcional).')
             .setRequired(false))),
-  
+
   async execute(interaction) {
     try {
-      await interaction.deferReply();
+      await interaction.deferReply(); // Defers the reply (we are going to edit it later)
+    } catch (error) {
+      return;
+    }
 
-      const firstRole = 'ROL_ID_1'; // Reemplaza con el ID del primer rol
-      const secondRole = 'ROL_ID_2'; // Reemplaza con el ID del segundo rol
-      const memberRoles = interaction.member.roles.cache;
+    // IDs de roles permitidos y sus límites
+    const roleLimits = {
+      '1281839512829558844': 1, // Rol 1: puede generar 1 carta al mes
+      '1327386590758309959': 2, // Rol 2: puede generar 2 cartas al mes
+    };
+    const memberRoles = interaction.member.roles.cache;
+
+    // Determinar el límite basado en el rol
+    let monthlyLimit = 0;
+    for (const [roleId, limit] of Object.entries(roleLimits)) {
+      if (memberRoles.has(roleId)) {
+        monthlyLimit = Math.max(monthlyLimit, limit); // Asignar el límite más alto del rol
+      }
+    }
+
+    if (monthlyLimit === 0) {
+      return interaction.editReply({ content: 'No tienes el permiso necesario para usar este comando.', ephemeral: true });
+    }
+
+    const idol = interaction.options.getString('idol');
+    const grupo = interaction.options.getString('group');
+    const era = interaction.options.getString('era');
+    const rarity = interaction.options.getString('rarity');
+    const event = interaction.options.getString('event'); // Obtener el valor del evento
+
+    // Función para escapar caracteres especiales en la expresión regular
+    const escapeRegExp = (string) => {
+      return string.replace(/[.*+?^=!:${}()|\[\]\/\\'"]/g, '\\$&'); // Escapa caracteres especiales, incluyendo apóstrofes y comillas
+    };
+
+    try {
       const userId = interaction.user.id;
 
-      // Validamos si el usuario tiene algún rol válido
-      if (!memberRoles.has(firstRole) && !memberRoles.has(secondRole)) {
-        return interaction.editReply({ content: 'No tienes el permiso necesario para usar este comando.', ephemeral: true });
+      // Obtener o crear el usuario en la base de datos
+      const user = await User.findOneAndUpdate(
+        { userId },
+        {
+          $setOnInsert: { userId, generatedCards: 0, lastReset: new Date() },
+        },
+        { upsert: true, new: true }
+      );
+
+      // Comprobar si es necesario resetear el conteo mensual
+      const currentMonth = new Date().getMonth();
+      const lastResetMonth = user.lastReset.getMonth();
+
+      if (currentMonth !== lastResetMonth) {
+        user.generatedCards = 0; // Resetear el conteo de cartas generadas
+        user.lastReset = new Date(); // Actualizar la fecha de reinicio
+        await user.save();
       }
 
-      const user = await User.findOne({ userId });
-      const currentMonth = new Date().toISOString().slice(0, 7); // Obtiene el mes actual en formato YYYY-MM
-
-      // Si no existe el usuario, lo inicializamos
-      if (!user) {
-        await User.create({
-          userId,
-          generateWonhoCount: 0,
-          generateResetMonth: currentMonth,
-        });
-      }
-
-      // Resetear el contador si estamos en un nuevo mes
-      if (user.generateResetMonth !== currentMonth) {
-        user.generateWonhoCount = 0;
-        user.generateResetMonth = currentMonth;
-      }
-
-      // Lógica para límites según roles
-      const maxUses = memberRoles.has(secondRole) ? 2 : 1; // Segundo rol puede generar 2 veces al mes, primero solo 1
-
-      if (user.generateWonhoCount >= maxUses) {
+      // Comprobar si el usuario ya alcanzó su límite mensual
+      if (user.generatedCards >= monthlyLimit) {
         return interaction.editReply({
-          content: `Has alcanzado el límite de generates permitidas este mes (${maxUses} veces).`,
+          content: `Has alcanzado tu límite mensual de ${monthlyLimit} carta(s).`,
           ephemeral: true,
         });
       }
 
-      // Incrementamos el contador de generación
-      user.generateWonhoCount += 1;
-      await user.save();
-
-      const idol = interaction.options.getString('idol');
-      const grupo = interaction.options.getString('group');
-      const era = interaction.options.getString('era');
-      const rarity = interaction.options.getString('rarity');
-      const event = interaction.options.getString('event');
-
-      const escapeRegExp = (string) => {
-        return string.replace(/[.*+?^=!:${}()|\[\]\/\\'"]/g, '\\$&');
-      };
-
+      // Buscar la carta en la base de datos
       let card;
-
       if (event) {
         card = await Card.findOne({
           idol: { $regex: new RegExp(escapeRegExp(idol), 'i') },
@@ -112,8 +123,9 @@ module.exports = {
         return interaction.editReply({ content: 'No se encontró ninguna carta que coincida con los criterios proporcionados.', ephemeral: true });
       }
 
+      // Generar el código único y actualizar la base de datos
       const uniqueCode = generateCardCode(card.idol, card.grupo, card.era, card.rarity, card.event);
-      const { copyNumber } = await incrementCardCount(userId, card._id);
+      const { copyNumber } = await incrementCardCount(interaction.user.id, card._id);
 
       const droppedCard = new DroppedCard({
         userId,
@@ -126,17 +138,20 @@ module.exports = {
         event: card.event,
         uniqueCode,
         copyNumber,
-        command: '/wonho gen',
+        command: '/generate wonho',
       });
 
       await droppedCard.save();
 
+      // Incrementar el contador mensual del usuario
+      user.generatedCards += 1;
+      await user.save();
+
+      // Crear el embed de la carta generada
       const cardEmbed = new EmbedBuilder()
-        .setTitle('Generated card:')
-        .setDescription(
-          `**${card.idol} - ${card.grupo}**\n<:dot:1296709116231684106>**Era:** ${card.era}\n<:dot:1296709116231684106>**Eshort:** \`${card.eshort}\`\n<:dot:1296709116231684106>**Copy:** \`#${copyNumber}\`\n\`\`\`${uniqueCode}\`\`\``
-        )
-        .setImage(card.image)
+        .setTitle(`Generated card:`)
+        .setDescription(`**${card.idol} - ${card.grupo}**\n<:dot:1296709116231684106>**Era:** ${card.era}\n<:dot:1296709116231684106>**Eshort:** \`${card.eshort}\`\n<:dot:1296709116231684106>**Copy:** \`#${droppedCard.copyNumber}\`\n\`\`\`${droppedCard.uniqueCode}\`\`\``)
+        .setImage(card.image) // Mostrar la imagen de la carta
         .setColor('#60a5fa');
 
       return interaction.editReply({ embeds: [cardEmbed] });

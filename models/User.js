@@ -14,10 +14,8 @@ const userSchema = new mongoose.Schema({
   lastUsedDate: { type: Date, default: null },
   hasUsedGenerate: { type: Boolean, default: false },
   GenerateStaff: { type: Boolean, default: false },
-  generatedCards: {
-    count: { type: Number, default: 0 }, // Número de cartas generadas este mes
-    lastGenerated: { type: Date, default: null }, // Fecha de la última generación
-  },
+  generatedCards: { type: Number, default: 0 }, // Número de cartas generadas en el mes
+  lastReset: { type: Date, default: new Date() }, // Fecha del último reinicio mensual
   isBanned: { type: Boolean, default: false },
   warnings: { type: Number, default: 0, },
 });

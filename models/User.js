@@ -14,6 +14,8 @@ const userSchema = new mongoose.Schema({
   lastUsedDate: { type: Date, default: null },
   hasUsedGenerate: { type: Boolean, default: false },
   GenerateStaff: { type: Boolean, default: false },
+  generatePayCount: { type: Number, default: 0 }, 
+  generateResetMonth: { type: String, default: null },
   isBanned: { type: Boolean, default: false },
   warnings: { type: Number, default: 0, },
 });

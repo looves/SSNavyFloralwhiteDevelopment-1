@@ -1,41 +1,101 @@
-const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder } = require('@discordjs/builders');
+const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, StringSelectMenuBuilder } = require('@discordjs/builders');
 const { EmbedBuilder, ButtonStyle } = require('discord.js');
 const ms = require('ms');
 const { formatDistanceToNow, addMilliseconds } = require('date-fns');
 const User = require('../models/User');
+const Inventory = require('../models/Inventory');
 
-const ALLOWED_ROLE_ID = '1076999909770788965'; // Reemplaza con el ID del rol permitido para crear sorteos
+const ALLOWED_ROLE_ID = '1076999909770788965';
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('gift')
-    .setDescription('Crea un regalo de monedas para un rol específico')
-    .addStringOption(option => 
-      option.setName('coins')
-        .setDescription('Cantidad de monedas a regalar')
-        .setRequired(true))
-    .addRoleOption(option =>
-      option.setName('rol')
-        .setDescription('Rol que puede reclamar el regalo')
-        .setRequired(true))
-    .addStringOption(option =>
-      option.setName('duracion')
-        .setDescription('Duración del sorteo (ej. 10m, 1h, 1d)')
-        .setRequired(true)),
+    .setDescription('Crea un regalo de monedas, packs o Bebegoms')
+    .addSubcommand(subcommand =>
+      subcommand
+        .setName('coins')
+        .setDescription('Regala monedas')
+        .addStringOption(option =>
+          option.setName('coins')
+            .setDescription('Cantidad de monedas a regalar')
+            .setRequired(true))
+        .addRoleOption(option =>
+          option.setName('rol')
+            .setDescription('Rol que puede reclamar el regalo')
+            .setRequired(true))
+        .addStringOption(option =>
+          option.setName('duracion')
+            .setDescription('Duración del sorteo (ej. 10m, 1h, 1d)')
+            .setRequired(true)))
+    .addSubcommand(subcommand =>
+      subcommand
+        .setName('packs')
+        .setDescription('Regala packs')
+        .addStringOption(option =>
+          option.setName('pack')
+            .setDescription('ID del pack a regalar')
+            .setRequired(true))
+        .addIntegerOption(option =>
+          option.setName('cantidad')
+            .setDescription('Cantidad de packs a regalar')
+            .setRequired(true))
+        .addRoleOption(option =>
+          option.setName('rol')
+            .setDescription('Rol que puede reclamar el regalo')
+            .setRequired(true))
+        .addStringOption(option =>
+          option.setName('duracion')
+            .setDescription('Duración del sorteo (ej. 10m, 1h, 1d)')
+            .setRequired(true)))
+    .addSubcommand(subcommand =>
+      subcommand
+        .setName('bebegoms')
+        .setDescription('Regala Bebegoms')
+        .addIntegerOption(option =>
+          option.setName('cantidad')
+            .setDescription('Cantidad de Bebegoms a regalar')
+            .setRequired(true))
+        .addRoleOption(option =>
+          option.setName('rol')
+            .setDescription('Rol que puede reclamar el regalo')
+            .setRequired(true))
+        .addStringOption(option =>
+          option.setName('duracion')
+            .setDescription('Duración del sorteo (ej. 10m, 1h, 1d)')
+            .setRequired(true))),
 
   async execute(interaction) {
     try {
-      await interaction.deferReply(); // Deferred reply
+      await interaction.deferReply();
     } catch (error) {
       return interaction.reply({ content: 'Hubo un error al intentar iniciar el sorteo.', ephemeral: true });
     }
 
-    // Verificar si el usuario tiene el rol permitido
     if (!interaction.member.roles.cache.has(ALLOWED_ROLE_ID)) {
-      return interaction.reply({ content: 'No tienes permiso para crear sorteos.', ephemeral: true });
+      return interaction.editReply({ content: 'No tienes permiso para crear sorteos.', ephemeral: true });
     }
 
-    const coins = interaction.options.getString('coins');
+    const subcommand = interaction.options.getSubcommand();
+
+    let embedTitle = "Wonho's Gift";
+    let embedDescription = "";
+    let giftType = "";
+
+    if (subcommand === 'coins') {
+      const coins = interaction.options.getString('coins');
+      giftType = "coins";
+      embedDescription = `<:dot:1296709116231684106>${coins} coins`;
+    } else if (subcommand === 'packs') {
+      const packId = interaction.options.getString('pack');
+      const quantity = interaction.options.getInteger('cantidad');
+      giftType = "packs";
+      embedDescription = `${quantity} packs (ID: ${packId})`;
+    } else if (subcommand === 'bebegoms') {
+      const quantity = interaction.options.getInteger('cantidad');
+      giftType = "bebegoms";
+      embedDescription = `${quantity} Bebegoms`;
+    }
+
     const role = interaction.options.getRole('rol');
     const duration = interaction.options.getString('duracion');
 
@@ -45,13 +105,13 @@ module.exports = {
     }
 
     const expirationTime = Date.now() + durationMs;
-    const expirationTimestamp = Math.floor(expirationTime / 1000); // Convertir a segundos
+    const expirationTimestamp = Math.floor(expirationTime / 1000);
 
     const embed = new EmbedBuilder()
       .setColor('#60a5fa')
-      .setTitle(`Wonho's Gift`)
+      .setTitle(embedTitle)
       .addFields(
-        { name: 'Cantidad:', value: `<:dot:1296709116231684106>${coins} coins`, inline: false },
+        { name: 'Regalo:', value: embedDescription, inline: false },
         { name: 'Rol:', value: `<:dot:1296709116231684106><@&${role.id}>`, inline: true },
         { name: '**Expira en:**', value: `<:dot:1296709116231684106><t:${expirationTimestamp}:R>`, inline: true }
       )
@@ -65,12 +125,12 @@ module.exports = {
           .setEmoji({ id: '1296709132266770432', name: 'stars' })
       );
 
-    await interaction.editReply({
+    const message = await interaction.editReply({
       embeds: [embed],
       components: [row]
     });
 
-    const filter = (i) => i.customId === 'gift_claim' && i.member.roles.cache.has(role.id);
+    const filter = (i) => i.customId === 'gift_claim' && i.member.roles.cache.has(role.id) && i.message.id === message.id;
     const collector = interaction.channel.createMessageComponentCollector({ filter, time: durationMs });
 
     const usuariosQueReclamaron = new Set();
@@ -90,44 +150,95 @@ module.exports = {
       }
     }
 
+    async function addPacksToUser(userId, packId, quantity) {
+      try {
+        let inventory = await Inventory.findOne({ userId });
+        if (!inventory) {
+          inventory = new Inventory({ userId, packs: new Map() });
+        }
+
+        const currentQuantity = inventory.packs.get(packId) || 0;
+        inventory.packs.set(packId, currentQuantity + quantity);
+
+        await inventory.save();
+        return true;
+      } catch (error) {
+        console.error(`Error al agregar packs al usuario ${userId}:`, error);
+        return false;
+      }
+    }
+
+    async function addBebegomsToUser(userId, quantity) {
+      try {
+        let user = await User.findOne({ userId });
+        if (!user) {
+          user = new User({ userId, bebegoms: 0 });
+        }
+        user.bebegoms += quantity;
+        await user.save();
+        return true;
+      } catch (error) {
+        console.error(`Error al agregar Bebegoms al usuario ${userId}:`, error);
+        return false;
+      }
+    }
+
     collector.on('collect', async (i) => {
       if (!usuariosQueReclamaron.has(i.user.id)) {
         usuariosQueReclamaron.add(i.user.id);
         try {
-          const success = await addCoinsToUser(i.user.id, coins);
-          if (success) {
-            await i.reply({ content: `¡Has reclamado exitosamente el regalo de ${coins} monedas!`, ephemeral: true });
-          } else {
-            await i.reply({ content: 'Hubo un error al procesar tu regalo. Intenta nuevamente.', ephemeral: true });
+
+          if (giftType === "coins") {
+            const coins = interaction.options.getString('coins');
+            const success = await addCoinsToUser(i.user.id, coins);
+            if (success) {
+              await i.update({ content: `¡Has reclamado exitosamente el regalo de ${coins} monedas!`, embeds: [], components: [] });
+            } else {
+              await i.update({ content: ''Hubo un error al procesar tu regalo. Intenta nuevamente.', embeds: [], components: [] });
+            }
+          } else if (giftType === "packs") {
+            const packId = interaction.options.getString('pack');
+            const quantity = interaction.options.getInteger('cantidad');
+            const success = await addPacksToUser(i.user.id, packId, quantity);
+            if (success) {
+              await i.update({ content: `¡Has reclamado exitosamente ${quantity} packs (ID: ${packId})!`, embeds: [], components: [] });
+            } else {
+              await i.update({ content: 'Hubo un error al procesar tu regalo. Intenta nuevamente.', embeds: [], components: [] });
+            }
+          } else if (giftType === "bebegoms") {
+            const quantity = interaction.options.getInteger('cantidad');
+            const success = await addBebegomsToUser(i.user.id, quantity);
+            if (success) {
+              await i.update({ content: `¡Has reclamado exitosamente ${quantity} Bebegoms!`, embeds: [], components: [] });
+            } else {
+              await i.update({ content: 'Hubo un error al procesar tu regalo. Intenta nuevamente.', embeds: [], components: [] });
+            }
           }
+
         } catch (error) {
           console.error('Error al procesar la reclamación:', error);
-          await i.reply({ content: 'Hubo un error al procesar tu solicitud.', ephemeral: true });
+          await i.update({ content: 'Hubo un error al procesar tu solicitud.', embeds: [], components: [] });
         }
       } else {
-        await i.reply({ content: '¡Ya reclamaste este regalo!', ephemeral: true });
+        await i.update({ content: '¡Ya reclamaste este regalo!', embeds: [], components: [] });
       }
     });
 
-    collector.on('end', async () => {
-      // Verifica si el embed aún está disponible para editarlo
+    collector.on('end', async (collected) => {
+      if (message.deleted) {
+        console.error('El mensaje ha sido eliminado antes de editarlo.');
+        return;
+      }
+
+      const updatedEmbed = new EmbedBuilder(embed)
+        .setTitle(`${embedTitle} (Finalizado)`)
+        .addFields(
+          { name: 'Total de participantes:', value: `<:dot:1296709116231684106>${usuariosQueReclamaron.size} usuarios.` }
+        )
+        .setFooter({ text: 'El regalo ha expirado.' });
+
       try {
-        if (interaction.deleted) {
-          console.error('La interacción ha sido eliminada antes de editarla.');
-          return;
-        }
-
-        const updatedEmbed = new EmbedBuilder(embed)
-          .setTitle(`Wonho's Gift (Finalizado)`)
-          .addFields(
-            { name: 'Total de participantes:', value: `<:dot:1296709116231684106>${usuariosQueReclamaron.size} usuarios.` }
-          )
-          .setFooter({ text: 'El regalo ha expirado.' });
-
-        await interaction.editReply({
-          embeds: [updatedEmbed],
-          components: [] // Eliminar botones después de la expiración
-        });
+        await message.edit({ embeds: [updatedEmbed], components: [] });
       } catch (error) {
         console.error('Error al intentar editar el embed final:', error);
       }

@@ -4,6 +4,8 @@ const ms = require('ms');
 const { formatDistanceToNow, addMilliseconds } = require('date-fns');
 const User = require('../models/User');
 const Inventory = require('../models/Inventory');
+const packs = require('../UtilsPacks'); // Importa UtilsPacks
+
 
 const ALLOWED_ROLE_ID = '1076999909770788965';
 
@@ -183,46 +185,46 @@ module.exports = {
       }
     }
 
-    collector.on('collect', async (i) => {
-      if (!usuariosQueReclamaron.has(i.user.id)) {
-        usuariosQueReclamaron.add(i.user.id);
-        try {
-          let claimMessage = "";
-          let packInfo; // Declarar packInfo aquí
+collector.on('collect', async (i) => {
+  if (!usuariosQueReclamaron.has(i.user.id)) {
+    usuariosQueReclamaron.add(i.user.id);
+    try {
+      let claimMessage = "";
+      let packInfo; // Declarar packInfo aquí
 
-          if (giftType === "coins") {
-            // ... (código para coins, igual que antes)
-          } else if (giftType === "packs") {
-            const packId = interaction.options.getString('pack');
-            const quantity = interaction.options.getInteger('cantidad');
+      if (giftType === "coins") {
+        // ... (código para coins, igual que antes)
+      } else if (giftType === "packs") {
+        const packId = interaction.options.getString('pack');
+        const quantity = interaction.options.getInteger('cantidad');
 
-            packInfo = packs.find(pack => pack.id === packId); // Asignar valor aquí
-            if (!packInfo) {
-              await i.update({ content: `No se encontró un pack con el ID '${packId}'.`, embeds: [], components: [] });
-              return; // Importante: Detener la ejecución si no se encuentra el pack
-            }
-
-            const success = await addPacksToUser(i.user.id, packId, quantity);
-            if (success) {
-              claimMessage = `¡Has reclamado exitosamente ${quantity} ${packInfo.name}!`; // Usar packInfo aquí
-            } else {
-              claimMessage = 'Hubo un error al procesar tu regalo. Intenta nuevamente.';
-            }
-          } else if (giftType === "bebegoms") {
-            // ... (código para bebgoms, igual que antes)
-          }
-
-          await i.reply({ content: claimMessage, ephemeral: true });
-          await i.update({ embeds: i.message.embeds, components: [] });
-
-        } catch (error) {
-          console.error('Error al procesar la reclamación:', error);
-          await i.reply({ content: 'Hubo un error al procesar tu solicitud.', ephemeral: true });
+        packInfo = packs.find(pack => pack.id === packId); // Asignar valor aquí
+        if (!packInfo) {
+          await i.update({ content: `No se encontró un pack con el ID '${packId}'.`, embeds: [], components: [] });
+          return; // Importante: Detener la ejecución si no se encuentra el pack
         }
-      } else {
-        await i.reply({ content: '¡Ya reclamaste este regalo!', ephemeral: true });
+
+        const success = await addPacksToUser(i.user.id, packId, quantity);
+        if (success) {
+          claimMessage = `¡Has reclamado exitosamente ${quantity} ${packInfo.name}!`; // Usar packInfo aquí
+        } else {
+          claimMessage = 'Hubo un error al procesar tu regalo. Intenta nuevamente.';
+        }
+      } else if (giftType === "bebegoms") {
+        // ... (código para bebgoms, igual que antes)
       }
-    });
+
+      await i.reply({ content: claimMessage, ephemeral: true });
+      await i.update({ embeds: i.message.embeds, components: [] });
+
+    } catch (error) {
+      console.error('Error al procesar la reclamación:', error);
+      await i.reply({ content: 'Hubo un error al procesar tu solicitud.', ephemeral: true });
+    }
+  } else {
+    await i.reply({ content: '¡Ya reclamaste este regalo!', ephemeral: true });
+  }
+});
 
     collector.on('end', async (collected) => {
       if (message.deleted) {

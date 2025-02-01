@@ -4,6 +4,7 @@ const ms = require('ms');
 const { formatDistanceToNow, addMilliseconds } = require('date-fns');
 const User = require('../models/User');
 const Inventory = require('../models/Inventory');
+const packs = require('../UtilsPacks'); // Ajusta la ruta si es necesario
 
 const ALLOWED_ROLE_ID = '1076999909770788965';
 
@@ -183,46 +184,58 @@ module.exports = {
       }
     }
 
-    collector.on('collect', async (i) => {
-      if (!usuariosQueReclamaron.has(i.user.id)) {
-        usuariosQueReclamaron.add(i.user.id);
-        try {
+  collector.on('collect', async (i) => {
+    if (!usuariosQueReclamaron.has(i.user.id)) {
+      usuariosQueReclamaron.add(i.user.id);
+      try {
+        let claimMessage = ""; // Variable para almacenar el mensaje de reclamación
 
-          if (giftType === "coins") {
-            const coins = interaction.options.getString('coins');
-            const success = await addCoinsToUser(i.user.id, coins);
-            if (success) {
-              await i.update({ content: `¡Has reclamado exitosamente el regalo de ${coins} monedas!`, embeds: [], components: [] });
-            } else {
-              await i.update({ content: 'Hubo un error al procesar tu regalo. Intenta nuevamente.', embeds: [], components: [] });
-            }
-          } else if (giftType === "packs") {
-            const packId = interaction.options.getString('pack');
-            const quantity = interaction.options.getInteger('cantidad');
-            const success = await addPacksToUser(i.user.id, packId, quantity);
-            if (success) {
-              await i.update({ content: `¡Has reclamado exitosamente ${quantity} packs (ID: ${packId})!`, embeds: [], components: [] });
-            } else {
-              await i.update({ content: 'Hubo un error al procesar tu regalo. Intenta nuevamente.', embeds: [], components: [] });
-            }
-          } else if (giftType === "bebegoms") {
-            const quantity = interaction.options.getInteger('cantidad');
-            const success = await addBebegomsToUser(i.user.id, quantity);
-            if (success) {
-              await i.update({ content: `¡Has reclamado exitosamente ${quantity} Bebegoms!`, embeds: [], components: [] });
-            } else {
-              await i.update({ content: 'Hubo un error al procesar tu regalo. Intenta nuevamente.', embeds: [], components: [] });
-            }
+        if (giftType === "coins") {
+          const coins = interaction.options.getString('coins');
+          const success = await addCoinsToUser(i.user.id, coins);
+          if (success) {
+            claimMessage = `¡Has reclamado exitosamente el regalo de ${coins} monedas!`;
+          } else {
+            claimMessage = 'Hubo un error al procesar tu regalo. Intenta nuevamente.';
           }
-
-        } catch (error) {
-          console.error('Error al procesar la reclamación:', error);
-          await i.update({ content: 'Hubo un error al procesar tu solicitud.', embeds: [], components: [] });
+        } else if (giftType === "packs") {
+          const packId = interaction.options.getString('pack');
+          const quantity = interaction.options.getInteger('cantidad');
+          const packInfo = packs.find(pack => pack.id === packId);
+          if (!packInfo) {
+            await i.update({ content: `No se encontró un pack con el ID '${packId}'.`, embeds: [], components: [] });
+            return;
+          }
+          const success = await addPacksToUser(i.user.id, packId, quantity);
+          if (success) {
+            claimMessage = `¡Has reclamado exitosamente ${quantity} ${packInfo.name}!`;
+          } else {
+            claimMessage = 'Hubo un error al procesar tu regalo. Intenta nuevamente.';
+          }
+        } else if (giftType === "bebegoms") {
+          const quantity = interaction.options.getInteger('cantidad');
+          const success = await addBebegomsToUser(i.user.id, quantity);
+          if (success) {
+            claimMessage = `¡Has reclamado exitosamente ${quantity} Bebegoms!`;
+          } else {
+            claimMessage = 'Hubo un error al procesar tu regalo. Intenta nuevamente.';
+          }
         }
-      } else {
-        await i.update({ content: '¡Ya reclamaste este regalo!', embeds: [], components: [] });
+
+        // Envía el mensaje de reclamación en un mensaje separado y efímero
+        await i.reply({ content: claimMessage, ephemeral: true });
+
+        // Actualiza *el mensaje original* para que el botón desaparezca y evitar múltiples reclamos
+        await i.update({ embeds: i.message.embeds, components: [] }); // Mantén el embed original
+
+      } catch (error) {
+        console.error('Error al procesar la reclamación:', error);
+        await i.reply({ content: 'Hubo un error al procesar tu solicitud.', ephemeral: true });
       }
-    });
+    } else {
+      await i.reply({ content: '¡Ya reclamaste este regalo!', ephemeral: true });
+    }
+  });
 
     collector.on('end', async (collected) => {
       if (message.deleted) {

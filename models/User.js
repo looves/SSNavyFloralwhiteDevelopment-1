@@ -5,6 +5,7 @@ const userSchema = new mongoose.Schema({
   userId: String,
   cardCount: Number,
   coins: { type: Number, default: 0 },
+  bebegoms: { type: Number, default: 0 },
   favoriteCard: String,
   searchText: String,
   currentStreak: Number,

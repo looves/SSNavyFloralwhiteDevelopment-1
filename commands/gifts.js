@@ -194,7 +194,7 @@ module.exports = {
             if (success) {
               await i.update({ content: `¡Has reclamado exitosamente el regalo de ${coins} monedas!`, embeds: [], components: [] });
             } else {
-              await i.update({ content: ''Hubo un error al procesar tu regalo. Intenta nuevamente.', embeds: [], components: [] });
+              await i.update({ content: 'Hubo un error al procesar tu regalo. Intenta nuevamente.', embeds: [], components: [] });
             }
           } else if (giftType === "packs") {
             const packId = interaction.options.getString('pack');

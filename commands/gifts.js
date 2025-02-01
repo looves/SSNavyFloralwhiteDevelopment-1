@@ -4,7 +4,6 @@ const ms = require('ms');
 const { formatDistanceToNow, addMilliseconds } = require('date-fns');
 const User = require('../models/User');
 const Inventory = require('../models/Inventory');
-const packs = require('../UtilsPacks'); // Ajusta la ruta si es necesario
 
 const ALLOWED_ROLE_ID = '1076999909770788965';
 

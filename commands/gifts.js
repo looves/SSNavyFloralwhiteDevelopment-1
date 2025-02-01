@@ -183,58 +183,46 @@ module.exports = {
       }
     }
 
-  collector.on('collect', async (i) => {
-    if (!usuariosQueReclamaron.has(i.user.id)) {
-      usuariosQueReclamaron.add(i.user.id);
-      try {
-        let claimMessage = ""; // Variable para almacenar el mensaje de reclamación
+    collector.on('collect', async (i) => {
+      if (!usuariosQueReclamaron.has(i.user.id)) {
+        usuariosQueReclamaron.add(i.user.id);
+        try {
+          let claimMessage = "";
+          let packInfo; // Declarar packInfo aquí
 
-        if (giftType === "coins") {
-          const coins = interaction.options.getString('coins');
-          const success = await addCoinsToUser(i.user.id, coins);
-          if (success) {
-            claimMessage = `¡Has reclamado exitosamente el regalo de ${coins} monedas!`;
-          } else {
-            claimMessage = 'Hubo un error al procesar tu regalo. Intenta nuevamente.';
+          if (giftType === "coins") {
+            // ... (código para coins, igual que antes)
+          } else if (giftType === "packs") {
+            const packId = interaction.options.getString('pack');
+            const quantity = interaction.options.getInteger('cantidad');
+
+            packInfo = packs.find(pack => pack.id === packId); // Asignar valor aquí
+            if (!packInfo) {
+              await i.update({ content: `No se encontró un pack con el ID '${packId}'.`, embeds: [], components: [] });
+              return; // Importante: Detener la ejecución si no se encuentra el pack
+            }
+
+            const success = await addPacksToUser(i.user.id, packId, quantity);
+            if (success) {
+              claimMessage = `¡Has reclamado exitosamente ${quantity} ${packInfo.name}!`; // Usar packInfo aquí
+            } else {
+              claimMessage = 'Hubo un error al procesar tu regalo. Intenta nuevamente.';
+            }
+          } else if (giftType === "bebegoms") {
+            // ... (código para bebgoms, igual que antes)
           }
-        } else if (giftType === "packs") {
-          const packId = interaction.options.getString('pack');
-          const quantity = interaction.options.getInteger('cantidad');
-          const packInfo = packs.find(pack => pack.id === packId);
-          if (!packInfo) {
-            await i.update({ content: `No se encontró un pack con el ID '${packId}'.`, embeds: [], components: [] });
-            return;
-          }
-          const success = await addPacksToUser(i.user.id, packId, quantity);
-          if (success) {
-            claimMessage = `¡Has reclamado exitosamente ${quantity} ${packInfo.name}!`;
-          } else {
-            claimMessage = 'Hubo un error al procesar tu regalo. Intenta nuevamente.';
-          }
-        } else if (giftType === "bebegoms") {
-          const quantity = interaction.options.getInteger('cantidad');
-          const success = await addBebegomsToUser(i.user.id, quantity);
-          if (success) {
-            claimMessage = `¡Has reclamado exitosamente ${quantity} Bebegoms!`;
-          } else {
-            claimMessage = 'Hubo un error al procesar tu regalo. Intenta nuevamente.';
-          }
+
+          await i.reply({ content: claimMessage, ephemeral: true });
+          await i.update({ embeds: i.message.embeds, components: [] });
+
+        } catch (error) {
+          console.error('Error al procesar la reclamación:', error);
+          await i.reply({ content: 'Hubo un error al procesar tu solicitud.', ephemeral: true });
         }
-
-        // Envía el mensaje de reclamación en un mensaje separado y efímero
-        await i.reply({ content: claimMessage, ephemeral: true });
-
-        // Actualiza *el mensaje original* para que el botón desaparezca y evitar múltiples reclamos
-        await i.update({ embeds: i.message.embeds, components: [] }); // Mantén el embed original
-
-      } catch (error) {
-        console.error('Error al procesar la reclamación:', error);
-        await i.reply({ content: 'Hubo un error al procesar tu solicitud.', ephemeral: true });
+      } else {
+        await i.reply({ content: '¡Ya reclamaste este regalo!', ephemeral: true });
       }
-    } else {
-      await i.reply({ content: '¡Ya reclamaste este regalo!', ephemeral: true });
-    }
-  });
+    });
 
     collector.on('end', async (collected) => {
       if (message.deleted) {

@@ -214,15 +214,14 @@ collector.on('collect', async (i) => {
         // ... (código para bebgoms, igual que antes)
       }
 
-      await i.reply({ content: claimMessage, ephemeral: true });
-      await i.update({ embeds: i.message.embeds, components: [] });
+await i.update({ content: claimMessage, embeds: [], components: [] }); // Un solo i.update
 
     } catch (error) {
       console.error('Error al procesar la reclamación:', error);
-      await i.reply({ content: 'Hubo un error al procesar tu solicitud.', ephemeral: true });
+      await i.update({ content: 'Hubo un error al procesar tu solicitud.', embeds: [], components: [] }); // Un solo i.update en caso de error
     }
   } else {
-    await i.reply({ content: '¡Ya reclamaste este regalo!', ephemeral: true });
+    await i.update({ content: '¡Ya reclamaste este regalo!', embeds: [], components: [] }); // Un solo i.update si ya reclamó
   }
 });
 

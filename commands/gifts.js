@@ -226,15 +226,27 @@ collector.on('collect', async (i) => {
           }
       }
 
-await i.update({ content: claimMessage, embeds: [], components: [] }); // Un solo i.update
+            if (i.replied) { // Comprobar si ya se respondió con i.reply
+                await i.followUp({ content: claimMessage, ephemeral: true }); // Usar i.followUp si ya se respondió
+            } else {
+                await i.reply({ content: claimMessage, ephemeral: true }); // Usar i.reply si es la primera vez
+            }
 
-    } catch (error) {
-      console.error('Error al procesar la reclamación:', error);
-      await i.update({ content: 'Hubo un error al procesar tu solicitud.', embeds: [], components: [] }); // Un solo i.update en caso de error
+        } catch (error) {
+            console.error('Error al procesar la reclamación:', error);
+            if (i.replied) {
+                await i.followUp({ content: 'Hubo un error al procesar tu solicitud.', ephemeral: true });
+            } else {
+                await i.reply({ content: 'Hubo un error al procesar tu solicitud.', ephemeral: true });
+            }
+        }
+    } else {
+        if (i.replied) {
+            await i.followUp({ content: '¡Ya reclamaste este regalo!', ephemeral: true });
+        } else {
+            await i.reply({ content: '¡Ya reclamaste este regalo!', ephemeral: true });
+        }
     }
-  } else {
-    await i.update({ content: '¡Ya reclamaste este regalo!', embeds: [], components: [] }); // Un solo i.update si ya reclamó
-  }
 });
 
     collector.on('end', async (collected) => {

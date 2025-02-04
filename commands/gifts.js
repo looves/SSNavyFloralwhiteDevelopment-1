@@ -97,7 +97,7 @@ module.exports = {
       }
       giftType = "packs";
       const emoji = pack.emoji || '';
-      embedDescription = `<:dot:1296709116231684106>**${quantity}** ${emoji} `${packId}``;
+      embedDescription = `<:dot:1296709116231684106>**${quantity}** ${emoji} \`${packId}\``;
     } else if (subcommand === 'bebegoms') {
       const quantity = interaction.options.getInteger('cantidad');
       giftType = "bebegoms";

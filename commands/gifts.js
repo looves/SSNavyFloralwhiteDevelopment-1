@@ -90,11 +90,15 @@ module.exports = {
     } else if (subcommand === 'packs') {
       const packId = interaction.options.getString('pack');
       const quantity = interaction.options.getInteger('cantidad');
-      const pack = packs[packId];
+const pack = packs.find(p => p.id === packId); // Find the pack by ID
 
-      if (!pack) {
-          return interaction.editReply({ content: `Pack with ID ${packId} not found.`, ephemeral: true });
-      }
+if (!pack) {
+  console.error(`No se encontró el pack con ID: ${packId}`);
+  return interaction.editReply({
+    content: `No se encontró un pack con el ID '${packId}'.`,
+    ephemeral: true
+  });
+}
       giftType = "packs";
       const emoji = pack.emoji || '';
       embedDescription = `<:dot:1296709116231684106>**${quantity}** ${emoji} \`${packId}\``;

@@ -86,16 +86,22 @@ module.exports = {
     if (subcommand === 'coins') {
       const coins = interaction.options.getString('coins');
       giftType = "coins";
-      embedDescription = `<:dot:1296709116231684106>${coins} :coin: coins`;
+      embedDescription = `<:dot:1296709116231684106>**${coins}** :coin: coins`;
     } else if (subcommand === 'packs') {
       const packId = interaction.options.getString('pack');
       const quantity = interaction.options.getInteger('cantidad');
+      const pack = packs[packId];
+
+      if (!pack) {
+          return interaction.editReply({ content: `Pack with ID ${packId} not found.`, ephemeral: true });
+      }
       giftType = "packs";
-      embedDescription = `${quantity} ${packs.emoji} ${packId})`;
+      const emoji = pack.emoji || '';
+      embedDescription = `<:dot:1296709116231684106>**${quantity}** ${emoji} `${packId}``;
     } else if (subcommand === 'bebegoms') {
       const quantity = interaction.options.getInteger('cantidad');
       giftType = "bebegoms";
-      embedDescription = `${quantity} <:bebegoms:1335008730617610350> Bebegoms`;
+      embedDescription = `<:dot:1296709116231684106>**${quantity}** <:bebegoms:1335008730617610350> Bebegoms`;
     }
 
     const role = interaction.options.getRole('rol');

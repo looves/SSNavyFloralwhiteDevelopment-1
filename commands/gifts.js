@@ -193,7 +193,13 @@ collector.on('collect', async (i) => {
       let packInfo; // Declarar packInfo aquí
 
       if (giftType === "coins") {
-        // ... (código para coins, igual que antes)
+          const coins = interaction.options.getString('coins');
+          const success = await addCoinsToUser(i.user.id, coins);
+          if (success) {
+            claimMessage = `¡Has reclamado exitosamente el regalo de ${coins} monedas!`;
+          } else {
+            claimMessage = 'Hubo un error al procesar tu regalo. Intenta nuevamente.';
+          }
       } else if (giftType === "packs") {
         const packId = interaction.options.getString('pack');
         const quantity = interaction.options.getInteger('cantidad');
@@ -211,7 +217,13 @@ collector.on('collect', async (i) => {
           claimMessage = 'Hubo un error al procesar tu regalo. Intenta nuevamente.';
         }
       } else if (giftType === "bebegoms") {
-        // ... (código para bebgoms, igual que antes)
+        const quantity = interaction.options.getInteger('cantidad');
+        const success = await addBebegomsToUser(i.user.id, quantity);
+          if (success) {
+            claimMessage = `¡Has reclamado exitosamente ${quantity} Bebegoms!`;
+          } else {
+            claimMessage = 'Hubo un error al procesar tu regalo. Intenta nuevamente.';
+          }
       }
 
 await i.update({ content: claimMessage, embeds: [], components: [] }); // Un solo i.update

@@ -108,9 +108,11 @@ module.exports = {
           }
         }
 
-        await i.update({ content: `Has reclamado exitosamente ${embedDescription}!`, components: [] });
+        await i.deferUpdate(); // Actualiza la interacción sin modificar el mensaje
+        await i.followUp({ content: `Has reclamado exitosamente ${embedDescription}!`, ephemeral: true });
       } else {
-        await i.update({ content: 'Ya has reclamado este regalo!', components: [] });
+        await i.deferUpdate();
+        await i.followUp({ content: 'Ya has reclamado este regalo!', ephemeral: true });
       }
     });
 

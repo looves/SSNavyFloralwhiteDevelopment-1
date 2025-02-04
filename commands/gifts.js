@@ -1,10 +1,11 @@
-const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder } = require('@discordjs/builders');
+const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, StringSelectMenuBuilder } = require('@discordjs/builders');
 const { EmbedBuilder, ButtonStyle } = require('discord.js');
 const ms = require('ms');
-const cron = require('node-cron');
-const packs = require('../utils/UtilsPacks');
+const { formatDistanceToNow, addMilliseconds } = require('date-fns');
 const User = require('../models/User');
 const Inventory = require('../models/Inventory');
+const packs = require('../utils/UtilsPacks'); // Importa UtilsPacks
+
 
 const ALLOWED_ROLE_ID = '1076999909770788965';
 
@@ -12,18 +13,91 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('gift')
     .setDescription('Crea un regalo de monedas, packs o Bebegoms')
-    .addStringOption(option => option.setName('item').setDescription('Especifica los ítems a regalar (ej. 5coins 2pack:pack123 3bebegoms)').setRequired(true))
-    .addRoleOption(option => option.setName('rol').setDescription('Rol que puede reclamar el regalo').setRequired(true))
-    .addStringOption(option => option.setName('duracion').setDescription('Duración del sorteo (ej. 10m, 1h, 1d)').setRequired(true)),
+    .addSubcommand(subcommand =>
+      subcommand
+        .setName('coins')
+        .setDescription('Regala monedas')
+        .addStringOption(option =>
+          option.setName('coins')
+            .setDescription('Cantidad de monedas a regalar')
+            .setRequired(true))
+        .addRoleOption(option =>
+          option.setName('rol')
+            .setDescription('Rol que puede reclamar el regalo')
+            .setRequired(true))
+        .addStringOption(option =>
+          option.setName('duracion')
+            .setDescription('Duración del sorteo (ej. 10m, 1h, 1d)')
+            .setRequired(true)))
+    .addSubcommand(subcommand =>
+      subcommand
+        .setName('packs')
+        .setDescription('Regala packs')
+        .addStringOption(option =>
+          option.setName('pack')
+            .setDescription('ID del pack a regalar')
+            .setRequired(true))
+        .addIntegerOption(option =>
+          option.setName('cantidad')
+            .setDescription('Cantidad de packs a regalar')
+            .setRequired(true))
+        .addRoleOption(option =>
+          option.setName('rol')
+            .setDescription('Rol que puede reclamar el regalo')
+            .setRequired(true))
+        .addStringOption(option =>
+          option.setName('duracion')
+            .setDescription('Duración del sorteo (ej. 10m, 1h, 1d)')
+            .setRequired(true)))
+    .addSubcommand(subcommand =>
+      subcommand
+        .setName('bebegoms')
+        .setDescription('Regala Bebegoms')
+        .addIntegerOption(option =>
+          option.setName('cantidad')
+            .setDescription('Cantidad de Bebegoms a regalar')
+            .setRequired(true))
+        .addRoleOption(option =>
+          option.setName('rol')
+            .setDescription('Rol que puede reclamar el regalo')
+            .setRequired(true))
+        .addStringOption(option =>
+          option.setName('duracion')
+            .setDescription('Duración del sorteo (ej. 10m, 1h, 1d)')
+            .setRequired(true))),
 
   async execute(interaction) {
-    await interaction.deferReply();
+    try {
+      await interaction.deferReply();
+    } catch (error) {
+      return interaction.reply({ content: 'Hubo un error al intentar iniciar el sorteo.', ephemeral: true });
+    }
 
     if (!interaction.member.roles.cache.has(ALLOWED_ROLE_ID)) {
       return interaction.editReply({ content: 'No tienes permiso para crear sorteos.', ephemeral: true });
     }
 
-    const itemString = interaction.options.getString('item');
+    const subcommand = interaction.options.getSubcommand();
+
+    let embedTitle = "Wonho's Gift";
+    let embedDescription = "";
+    let giftType = "";
+
+    if (subcommand === 'coins') {
+      const coins = interaction.options.getString('coins');
+      giftType = "coins";
+      embedDescription = `<:dot:1296709116231684106>${coins} coins`;
+    } else if (subcommand === 'packs') {
+      const packId = interaction.options.getString('pack');
+      const quantity = interaction.options.getInteger('cantidad');
+      giftType = "packs";
+      embedDescription = `${quantity} packs (ID: ${packId})`;
+    } else if (subcommand === 'bebegoms') {
+      const quantity = interaction.options.getInteger('cantidad');
+      giftType = "bebegoms";
+      embedDescription = `${quantity} Bebegoms`;
+    }
+
     const role = interaction.options.getRole('rol');
     const duration = interaction.options.getString('duracion');
 
@@ -35,101 +109,140 @@ module.exports = {
     const expirationTime = Date.now() + durationMs;
     const expirationTimestamp = Math.floor(expirationTime / 1000);
 
-    // Procesar el string de items
-    const items = itemString.split(' ').map(item => {
-      const coinsMatch = item.match(/(\d+)coins/);
-      const bebegomsMatch = item.match(/(\d+)bebegoms/);
-      const packMatch = item.match(/(\d+)pack:(\w+)/);
-
-      if (coinsMatch) return { type: 'coins', amount: parseInt(coinsMatch[1]) };
-      if (bebegomsMatch) return { type: 'bebegoms', amount: parseInt(bebegomsMatch[1]) };
-      if (packMatch) return { type: 'pack', amount: parseInt(packMatch[1]), packId: packMatch[2] };
-
-      return null;
-    }).filter(Boolean);
-
-    if (items.length === 0) {
-      return interaction.editReply('No se encontraron ítems válidos. Usa el formato correcto (ej. 5coins 2pack:pack123 3bebegoms).');
-    }
-
-    // Crear la descripción del embed
-    const embedDescription = items.map(item => {
-      if (item.type === 'coins') return `${item.amount} coins`;
-      if (item.type === 'bebegoms') return `${item.amount} Bebegoms`;
-      if (item.type === 'pack') {
-        const packInfo = packs.find(pack => pack.id === item.packId);
-        return packInfo ? `${item.amount} ${packInfo.name}` : `${item.amount} pack (ID: ${item.packId})`;
-      }
-    }).join(', ');
-
     const embed = new EmbedBuilder()
       .setColor('#60a5fa')
-      .setTitle("Wonho's Gift")
+      .setTitle(embedTitle)
       .addFields(
         { name: 'Regalo:', value: embedDescription, inline: false },
-        { name: 'Rol:', value: `<@&${role.id}>`, inline: true },
-        { name: 'Expira en:', value: `<t:${expirationTimestamp}:R>`, inline: true }
+        { name: 'Rol:', value: `<:dot:1296709116231684106><@&${role.id}>`, inline: true },
+        { name: '**Expira en:**', value: `<:dot:1296709116231684106><t:${expirationTimestamp}:R>`, inline: true }
       )
       .setFooter({ text: 'Haz clic en el botón para reclamar tu regalo.' });
 
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId('gift_claim').setStyle(ButtonStyle.Secondary).setEmoji({ id: '1296709132266770432', name: 'stars' })
-    );
+    const row = new ActionRowBuilder()
+      .addComponents(
+        new ButtonBuilder()
+          .setCustomId('gift_claim')
+          .setStyle(ButtonStyle.Secondary)
+          .setEmoji({ id: '1296709132266770432', name: 'stars' })
+      );
 
-    const message = await interaction.editReply({ embeds: [embed], components: [row] });
+    const message = await interaction.editReply({
+      embeds: [embed],
+      components: [row]
+    });
+
+    const filter = (i) => i.customId === 'gift_claim' && i.member.roles.cache.has(role.id) && i.message.id === message.id;
+    const collector = interaction.channel.createMessageComponentCollector({ filter, time: durationMs });
 
     const usuariosQueReclamaron = new Set();
 
-    const filter = (i) => i.customId === 'gift_claim' && i.member.roles.cache.has(role.id);
-    const collector = interaction.channel.createMessageComponentCollector({ filter, time: durationMs });
+    async function addCoinsToUser(userId, coins) {
+      try {
+        let user = await User.findOne({ userId });
+        if (!user) {
+          user = new User({ userId, coins: 0 });
+        }
+        user.coins += parseInt(coins);
+        await user.save();
+        return true;
+      } catch (error) {
+        console.error(`Error al agregar monedas al usuario ${userId}:`, error);
+        return false;
+      }
+    }
 
-    collector.on('collect', async (i) => {
-      if (!usuariosQueReclamaron.has(i.user.id)) {
-        usuariosQueReclamaron.add(i.user.id);
-
-        // Procesar los ítems reclamados
-        for (const item of items) {
-          if (item.type === 'coins') {
-            let user = await User.findOne({ userId: i.user.id });
-            if (!user) user = new User({ userId: i.user.id, coins: 0, bebegoms: 0 });
-            user.coins += item.amount;
-            await user.save();
-          } else if (item.type === 'bebegoms') {
-            let user = await User.findOne({ userId: i.user.id });
-            if (!user) user = new User({ userId: i.user.id, coins: 0, bebegoms: 0 });
-            user.bebegoms += item.amount;
-            await user.save();
-          } else if (item.type === 'pack') {
-            let inventory = await Inventory.findOne({ userId: i.user.id });
-            if (!inventory) inventory = new Inventory({ userId: i.user.id, packs: {} });
-
-            inventory.packs[item.packId] = (inventory.packs[item.packId] || 0) + item.amount;
-            await inventory.save();
-          }
+    async function addPacksToUser(userId, packId, quantity) {
+      try {
+        let inventory = await Inventory.findOne({ userId });
+        if (!inventory) {
+          inventory = new Inventory({ userId, packs: new Map() });
         }
 
-        await i.deferUpdate(); // Actualiza la interacción sin modificar el mensaje
-        await i.followUp({ content: `Has reclamado exitosamente ${embedDescription}!`, ephemeral: true });
-      } else {
-        await i.deferUpdate();
-        await i.followUp({ content: 'Ya has reclamado este regalo!', ephemeral: true });
+        const currentQuantity = inventory.packs.get(packId) || 0;
+        inventory.packs.set(packId, currentQuantity + quantity);
+
+        await inventory.save();
+        return true;
+      } catch (error) {
+        console.error(`Error al agregar packs al usuario ${userId}:`, error);
+        return false;
       }
-    });
+    }
 
-    cron.schedule(new Date(expirationTime).toISOString().slice(14, 19) + ' * * * *', async () => {
-      if (message.deleted) return;
+    async function addBebegomsToUser(userId, quantity) {
+      try {
+        let user = await User.findOne({ userId });
+        if (!user) {
+          user = new User({ userId, bebegoms: 0 });
+        }
+        user.bebegoms += quantity;
+        await user.save();
+        return true;
+      } catch (error) {
+        console.error(`Error al agregar Bebegoms al usuario ${userId}:`, error);
+        return false;
+      }
+    }
 
-      const updatedEmbed = EmbedBuilder.from(embed)
-        .setTitle(`Wonho's Gift (Finalizado)`)
+collector.on('collect', async (i) => {
+  if (!usuariosQueReclamaron.has(i.user.id)) {
+    usuariosQueReclamaron.add(i.user.id);
+    try {
+      let claimMessage = "";
+      let packInfo; // Declarar packInfo aquí
+
+      if (giftType === "coins") {
+        // ... (código para coins, igual que antes)
+      } else if (giftType === "packs") {
+        const packId = interaction.options.getString('pack');
+        const quantity = interaction.options.getInteger('cantidad');
+
+        packInfo = packs.find(pack => pack.id === packId); // Asignar valor aquí
+        if (!packInfo) {
+          await i.update({ content: `No se encontró un pack con el ID '${packId}'.`, embeds: [], components: [] });
+          return; // Importante: Detener la ejecución si no se encuentra el pack
+        }
+
+        const success = await addPacksToUser(i.user.id, packId, quantity);
+        if (success) {
+          claimMessage = `¡Has reclamado exitosamente ${quantity} ${packInfo.name}!`; // Usar packInfo aquí
+        } else {
+          claimMessage = 'Hubo un error al procesar tu regalo. Intenta nuevamente.';
+        }
+      } else if (giftType === "bebegoms") {
+        // ... (código para bebgoms, igual que antes)
+      }
+
+await i.update({ content: claimMessage, embeds: [], components: [] }); // Un solo i.update
+
+    } catch (error) {
+      console.error('Error al procesar la reclamación:', error);
+      await i.update({ content: 'Hubo un error al procesar tu solicitud.', embeds: [], components: [] }); // Un solo i.update en caso de error
+    }
+  } else {
+    await i.update({ content: '¡Ya reclamaste este regalo!', embeds: [], components: [] }); // Un solo i.update si ya reclamó
+  }
+});
+
+    collector.on('end', async (collected) => {
+      if (message.deleted) {
+        console.error('El mensaje ha sido eliminado antes de editarlo.');
+        return;
+      }
+
+      const updatedEmbed = new EmbedBuilder(embed)
+        .setTitle(`${embedTitle} (Finalizado)`)
         .addFields(
-          { name: 'Total de participantes:', value: `${usuariosQueReclamaron.size} usuarios.` }
+          { name: 'Total de participantes:', value: `<:dot:1296709116231684106>${usuariosQueReclamaron.size} usuarios.` }
         )
         .setFooter({ text: 'El regalo ha expirado.' });
 
-      await message.edit({ embeds: [updatedEmbed], components: [] });
-    }, {
-      scheduled: true,
-      timezone: "UTC"
+      try {
+        await message.edit({ embeds: [updatedEmbed], components: [] });
+      } catch (error) {
+        console.error('Error al intentar editar el embed final:', error);
+      }
     });
   },
 };

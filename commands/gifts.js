@@ -86,16 +86,16 @@ module.exports = {
     if (subcommand === 'coins') {
       const coins = interaction.options.getString('coins');
       giftType = "coins";
-      embedDescription = `<:dot:1296709116231684106>${coins} coins`;
+      embedDescription = `<:dot:1296709116231684106>${coins} :coin: coins`;
     } else if (subcommand === 'packs') {
       const packId = interaction.options.getString('pack');
       const quantity = interaction.options.getInteger('cantidad');
       giftType = "packs";
-      embedDescription = `${quantity} packs (ID: ${packId})`;
+      embedDescription = `${quantity} ${packInfo.emoji} ${packId})`;
     } else if (subcommand === 'bebegoms') {
       const quantity = interaction.options.getInteger('cantidad');
       giftType = "bebegoms";
-      embedDescription = `${quantity} Bebegoms`;
+      embedDescription = `${quantity} <:bebegoms:1335008730617610350> Bebegoms`;
     }
 
     const role = interaction.options.getRole('rol');
@@ -196,7 +196,7 @@ collector.on('collect', async (i) => {
           const coins = interaction.options.getString('coins');
           const success = await addCoinsToUser(i.user.id, coins);
           if (success) {
-            claimMessage = `¡Has reclamado exitosamente el regalo de ${coins} monedas!`;
+            claimMessage = `¡Has reclamado exitosamente el regalo de **${coins}** :coin: monedas!`;
           } else {
             claimMessage = 'Hubo un error al procesar tu regalo. Intenta nuevamente.';
           }
@@ -212,7 +212,7 @@ collector.on('collect', async (i) => {
 
         const success = await addPacksToUser(i.user.id, packId, quantity);
         if (success) {
-          claimMessage = `¡Has reclamado exitosamente ${quantity} ${packInfo.name}!`; // Usar packInfo aquí
+          claimMessage = `¡Has reclamado exitosamente **${quantity}** ${packInfo.emoji} ${packInfo.name}!`; // Usar packInfo aquí
         } else {
           claimMessage = 'Hubo un error al procesar tu regalo. Intenta nuevamente.';
         }
@@ -220,7 +220,7 @@ collector.on('collect', async (i) => {
         const quantity = interaction.options.getInteger('cantidad');
         const success = await addBebegomsToUser(i.user.id, quantity);
           if (success) {
-            claimMessage = `¡Has reclamado exitosamente ${quantity} Bebegoms!`;
+            claimMessage = `¡Has reclamado exitosamente **${quantity}** <:bebegoms:1335008730617610350> Bebegoms!`;
           } else {
             claimMessage = 'Hubo un error al procesar tu regalo. Intenta nuevamente.';
           }
@@ -259,8 +259,7 @@ collector.on('collect', async (i) => {
         .setTitle(`${embedTitle} (Finalizado)`)
         .addFields(
           { name: 'Total de participantes:', value: `<:dot:1296709116231684106>${usuariosQueReclamaron.size} usuarios.` }
-        )
-        .setFooter({ text: 'El regalo ha expirado.' });
+        );
 
       try {
         await message.edit({ embeds: [updatedEmbed], components: [] });

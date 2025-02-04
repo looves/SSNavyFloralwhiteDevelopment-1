@@ -11,8 +11,6 @@ const client = new Discord.Client({
 
 // Conectar a MongoDB usando MONGO_URI de las variables de entorno
 mongoose.connect(process.env.MONGO_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
   serverSelectionTimeoutMS: 5000 // Tiempo de espera de 5 segundos
 })
   .then(() => console.log('Conectado a MongoDB'))

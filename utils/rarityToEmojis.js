@@ -5,7 +5,8 @@ module.exports = (rarityOrEvent) => {
         2: '<:stars:1296707011500838932><:stars:1296707011500838932>',
         3: '<:stars:1296707011500838932><:stars:1296707011500838932><:stars:1296707011500838932>',
 
-        XMAS: '<:xmas:1321692124554723389>'
+        XMAS: '<:xmas:1321692124554723389>',
+		VALENTINES: '<:valentines:1335069131623366786>'
     };
 
     if (typeof rarityOrEvent === 'string' && emojis[rarityOrEvent]) {
